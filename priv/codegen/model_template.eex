@@ -1,0 +1,95 @@
+defmodule Mw.Data.Model.Route do
+  @moduledoc """
+  Route API.
+  """
+
+  use Mw.Data.Model
+  alias Ecto.Multi
+  alias Mw.Data.Schema.Route
+
+  @doc """
+  Creates a `route` with supplied `params`.
+
+  A `route` is created in the system along with to
+  certain `permissions`, refer `Mw.Data.Schema.Permission`.
+  The `create` function expects a list of `permission` `ids`
+  in `params` in order to perform the association, while creating
+  the route with the supplied `name` and `description`.
+
+  `params` is a `map` which can have following fields:
+  `method`: The HTTP method the route responds to, ie. GET or POST
+  `slug`: The path the route responds to, beginning with a /
+  `controller`: The controller the Route is directed towards
+  `action`: The controller action that is called to respond to the route
+
+  > #### Note
+  > "slug" should be unique amongst routes.
+  """
+  @spec create(map) :: {:ok, Route.t()} | {:error, Ecto.Changeset.t()}
+  def create(params) do
+    QH.create(Route, params, Repo)
+  end
+
+  @doc """
+  Updates a route with the supplied params.
+
+  To update, either the `id` field should be supplied in the
+  `params` map or, the `instance` of the `route` to be updated
+  should be passed as second argument.
+
+  If `permissions` field containing a list of `permission_ids`
+  is, supplied in `params` then the association with `permissions`
+  is updated and earlier assciations are removed.
+  """
+  @spec update(map, Route.t()) :: {:ok, Route.t() | nil} | {:error, Ecto.Changeset.t()}
+  def update(params, instance) do
+    QH.update(Route, params, instance, Repo)
+  end
+
+  @doc """
+  Deletes a route.
+
+  Takes as input `id` or `instance` of the route to be deleted.
+  """
+  @spec delete(integer | Route.t()) ::
+          {:ok, Route.t()}
+          | {:error, Ecto.ChangeSet.t()}
+          | {:error, :not_found}
+  def delete(param) do
+    QH.delete(Route, param, Repo)
+  end
+
+  @doc """
+  Returns a route.
+
+  Takes as input `id` of the route to be retrieved.
+  """
+  @spec get(integer) :: Route.t() | nil
+  def get(id) do
+    QH.get(Route, id, Repo)
+  end
+
+  @doc """
+  Returns all the routes in the system.
+  """
+  @spec get_all() :: [Route.t()]
+  def get_all do
+    Repo.all(Route)
+  end
+
+  @doc """
+  Returns the route for the given slug.
+  """
+  @spec get_route_by_slug(String.t()) :: Route.t()
+  def get_route_by_slug(slug) do
+    Repo.get_by(Route, slug: slug)
+  end
+
+  @doc """
+  Returns a list of routes in the format {route.id, route.method, route.slug, route.controller, route.action}
+  """
+  @spec formatted_list() :: [{String.t(), non_neg_integer}]
+  def formatted_list do
+    Repo.all(from(c in Route, select: {c.id, c.method, c.slug, c.controller, c.action}))
+  end
+end

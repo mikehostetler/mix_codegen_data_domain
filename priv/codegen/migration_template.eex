@@ -1,0 +1,16 @@
+defmodule Mw.Repo.Migrations.AddRouteTable do
+  use Ecto.Migration
+
+  def change do
+    create table(:route) do
+      add(:method, :string, null: false)
+      add(:slug, :string, null: false)
+      add(:controller, :string)
+      add(:action, :string)
+
+      timestamps()
+    end
+
+    create(unique_index(:route, :slug))
+  end
+end

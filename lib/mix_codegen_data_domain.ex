@@ -1,0 +1,2 @@
+defmodule MixCodegenDataDomain do
+end

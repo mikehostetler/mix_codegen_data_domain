@@ -1,0 +1,117 @@
+defmodule Mw.Data.Model.RouteTest do
+  use ExUnit.Case
+  use Mw.DataCase
+  import Mw.Factory
+  alias Mw.Data.Model.Route
+  alias Mw.Data.Schema.Route, as: RouteSchema
+
+  setup do
+    valid_attrs = %{
+      method: "GET",
+      slug: "sample-route",
+      controller: "MwWeb.Controller",
+      action: "index"
+    }
+
+    [valid_attrs: valid_attrs]
+  end
+
+  describe "create" do
+    test "inserts with valid attributes", %{valid_attrs: params} do
+      assert {:ok, %RouteSchema{}} = Route.create(params)
+    end
+
+    test "creation fails for duplicate slug", %{valid_attrs: params} do
+      route = insert(:route)
+      assert {:error, changeset} = Route.create(Map.put(params, :slug, route.slug))
+      assert %{slug: ["has already been taken"]} = errors_on(changeset)
+    end
+
+    test "creation fails for missing method", %{valid_attrs: va} do
+      assert {:error, changeset} = Route.create(Map.delete(va, :method))
+      assert %{method: ["can't be blank"]} = errors_on(changeset)
+    end
+
+    test "creation fails for missing slug", %{valid_attrs: va} do
+      assert {:error, changeset} = Route.create(Map.delete(va, :slug))
+      assert %{slug: ["can't be blank"]} = errors_on(changeset)
+    end
+
+    test "creation fails for missing controller", %{valid_attrs: va} do
+      assert {:error, changeset} = Route.create(Map.delete(va, :controller))
+      assert %{controller: ["can't be blank"]} = errors_on(changeset)
+    end
+
+    test "creation fails for missing action", %{valid_attrs: va} do
+      assert {:error, changeset} = Route.create(Map.delete(va, :action))
+      assert %{action: ["can't be blank"]} = errors_on(changeset)
+    end
+  end
+
+  describe "update/2" do
+    setup %{valid_attrs: params} do
+      {:ok, route} = Route.create(params)
+      [route: route]
+    end
+
+    test "inserts with valid attributes", %{route: route} do
+      %{id: expected_id} = route
+      updates = %{slug: "new-slug"}
+      assert {:ok, %{id: received_id}} = Route.update(updates, route)
+      assert expected_id == received_id
+    end
+
+    test "FAILS for invalid attributes", %{route: route} do
+      updates = %{method: :get, slug: 1337, controller: 42, action: -1}
+      {:error, changeset} = Route.update(updates, route)
+      refute changeset.valid?
+
+      assert %{
+               method: ["is invalid"],
+               slug: ["is invalid"],
+               controller: ["is invalid"],
+               action: ["is invalid"]
+             } = errors_on(changeset)
+    end
+  end
+
+  describe "delete/2" do
+    setup %{valid_attrs: va} do
+      {:ok, %{id: route_id}} = Route.create(va)
+      [route_id: route_id]
+    end
+
+    test "FAILS to delete for invalid id" do
+      assert {:error, :not_found} = Route.delete(-1)
+    end
+
+    test "deletes for valid id", %{route_id: route_id} do
+      assert {:ok, %{id: received_id} = %RouteSchema{}} = Route.delete(route_id)
+      assert received_id == route_id
+    end
+  end
+
+  test "get route" do
+    route = insert(:route)
+    assert route_returned = Route.get(route.id)
+    assert route_returned.id == route.id
+    assert {:ok, _} = Route.delete(route)
+    assert Route.get(route.id) == nil
+  end
+
+  test "get route by slug" do
+    route = insert(:route)
+    assert route_returned = Route.get_route_by_slug(route.slug)
+    assert route_returned.id == route.id
+  end
+
+  test "get all routes" do
+    insert(:route)
+    assert Route.get_all() != []
+  end
+
+  test "get formatted list" do
+    insert(:route)
+    assert Route.formatted_list() != []
+  end
+end
