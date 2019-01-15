@@ -22,3 +22,4 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 mix_codegen_data_domain-*.tar
 
+.elixir_ls

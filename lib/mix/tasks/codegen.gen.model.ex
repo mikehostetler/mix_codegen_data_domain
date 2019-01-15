@@ -1,10 +1,14 @@
 defmodule Mix.Tasks.Codegen.Gen.Model do
   use Mix.Task
+
   import Macro, only: [camelize: 1, underscore: 1]
   import Mix.Generator
+  import Path
+
+  @shortdoc "Mix Codegen compliant task to generate a new model"
 
   def run(args) do
-    {_opts, [lib_name, resource, plural_name | inputs], _} =
+    {_opts, [app_name, resource, plural_name | inputs], _} =
       OptionParser.parse(args, switches: [])
 
     resource_list = String.split(resource, "/")
@@ -15,20 +19,14 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
       |> parse_inputs()
       |> generate_schema_types()
 
-    generate_model(lib_name, context, singular_name, plural_name, inputs)
-    generate_migration(lib_name, context, singular_name, plural_name, inputs)
-    generate_model_test(lib_name, context, singular_name, plural_name, inputs)
+    generate_model(app_name, context, singular_name, plural_name, inputs)
+    # generate_migration(app_name, context, singular_name, plural_name, inputs)
+    # generate_model_test(app_name, context, singular_name, plural_name, inputs)
   end
 
-  defp generate_model(lib_name, context, singular_name, plural_name, inputs) do
-    path = "lib/#{underscore(lib_name)}/data/model"
-    base_name = "#{underscore(singular_name)}.ex"
-    file = Path.join(path, base_name)
-
-    create_directory(path)
-
+  defp generate_model(app_name, context, singular_name, plural_name, inputs) do
     contexts = [
-      lib_name: camelize(lib_name),
+      app_name: camelize(app_name),
       mod: camelize(singular_name),
       context: camelize(context),
       plural_name: underscore(plural_name),
@@ -36,10 +34,14 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
       assocs: inputs.assocs
     ]
 
-    create_file(file, model_template(contexts))
+    path = "lib/#{underscore(app_name)}/data/model/#{underscore(singular_name)}.ex"
+    create_file(path, model_template(contexts))
+
+    path = "lib/#{underscore(app_name)}/data/model/gen/#{underscore(singular_name)}.ex"
+    create_file(path, model_codegen_template(contexts))
   end
 
-  defp generate_migration(lib_name, context, singular_name, plural_name, inputs) do
+  defp generate_migration(app_name, context, singular_name, plural_name, inputs) do
     path = "priv/repo/migrations/"
     base_name = "#{timestamp()}_create_#{underscore(plural_name)}_table.exs"
     file = Path.join(path, base_name)
@@ -47,7 +49,7 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
     create_directory(path)
 
     contexts = [
-      lib_name: camelize(lib_name),
+      app_name: camelize(app_name),
       mod: camelize(singular_name),
       context: camelize(context),
       plural_name: underscore(plural_name),
@@ -58,15 +60,15 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
     create_file(file, migration_template(contexts))
   end
 
-  defp generate_model_test(lib_name, context, singular_name, plural_name, inputs) do
-    path = "test/#{underscore(lib_name)}/test/data/model"
+  defp generate_model_test(app_name, context, singular_name, plural_name, inputs) do
+    path = "test/data/model"
     base_name = "#{underscore(singular_name)}_test.exs"
     file = Path.join(path, base_name)
 
     create_directory(path)
 
     contexts = [
-      lib_name: camelize(lib_name),
+      app_name: camelize(app_name),
       mod: camelize(singular_name),
       context: camelize(context),
       plural_name: underscore(plural_name),
@@ -81,20 +83,40 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
 
   try do
     embed_template(:model,
-      from_file:
-        Path.expand(
-          "../../../../../priv/codegen/model_template.eex",
-          __DIR__
-        )
+      from_file: Path.expand("#{__DIR__}/../../../priv/codegen/model_template.eex")
     )
   rescue
     _ ->
       embed_template(:model, """
-      defmodule <%= @lib_name %>.Data.Model.<%= @mod %> do
-        use <%= @lib_name %>.Model
+      defmodule <%= @app_name %>.Data.Model.<%= @mod %> do
+        use <%= @app_name %>.Model
 
         alias Ecto.Multi
-        alias <%= @lib_name %>.Data.Schema.<%= @mod %>
+        alias <%= @app_name %>.Data.Schema.<%= @mod %>
+
+        schema "<%= @plural_name %>" do
+        <%= for {field, type} <- @fields do %>
+          field :<%= field %>, <%= type %><% end %>
+        <%= for {field, _type, schema} <- @assocs do %>
+          belongs_to :<%= field %>, <%= schema %><% end %>
+          timestamps()
+        end
+      end
+      """)
+  end
+
+  try do
+    embed_template(:model_base,
+      from_file: Path.expand("#{__DIR__}/../../../priv/codegen/model_base_template.eex")
+    )
+  rescue
+    _ ->
+      embed_template(:model, """
+      defmodule <%= @app_name %>.Data.Model.<%= @mod %> do
+        use <%= @app_name %>.Model
+
+        alias Ecto.Multi
+        alias <%= @app_name %>.Data.Schema.<%= @mod %>
 
         schema "<%= @plural_name %>" do
         <%= for {field, type} <- @fields do %>
@@ -109,16 +131,12 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
 
   try do
     embed_template(:migration,
-      from_file:
-        Path.expand(
-          "../../../../../priv/codegen/migration_template.eex",
-          __DIR__
-        )
+      from_file: Path.expand("#{__DIR__}/../../../priv/codegen/migration_template.eex")
     )
   rescue
     _ ->
       embed_template(:migration, """
-      defmodule <%= @lib_name %>.Repo.Migrations.Create<%= @mod %> do
+      defmodule <%= @app_name %>.Repo.Migrations.Create<%= @mod %> do
         use Ecto.Migration
 
         def change do
@@ -135,18 +153,14 @@ defmodule Mix.Tasks.Codegen.Gen.Model do
 
   try do
     embed_template(:model_test,
-      from_file:
-        Path.expand(
-          "../../../../../priv/codegen/model_test_template.eex",
-          __DIR__
-        )
+      from_file: Path.expand("#{__DIR__}/../../../priv/codegen/model_test_template.eex")
     )
   rescue
     _ ->
       embed_template(:model_test, """
-      defmodule <%= @lib_name %>.<%= @context %>.<%= @mod %>Test do
-        use <%= @lib_name %>.DataCase
-        # alias <%= @lib_name %>.<%= @context %>.<%= @mod %>
+      defmodule <%= @app_name %>.<%= @context %>.<%= @mod %>Test do
+        use <%= @app_name %>.DataCase
+        # alias <%= @app_name %>.<%= @context %>.<%= @mod %>
 
         test "example" do
           assert true
